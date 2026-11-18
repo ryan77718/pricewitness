@@ -1,0 +1,1 @@
+{"name":"pricewitness","version":"1.0.0","type":"module","private":true,"engines":{"node":">=22.13.0"},"scripts":{"dev":"node scripts/preview.mjs","start":"node scripts/preview.mjs","build":"node scripts/build.mjs","test":"node --test tests/community.test.mjs"}}
