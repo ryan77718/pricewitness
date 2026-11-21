@@ -1,0 +1,26 @@
+// Used by the website, the price-event worker and the downloadable companion.
+export const providerDirectory = {
+  "Harris Teeter":["grocery","harristeeter.com"], "Food Lion":["grocery","foodlion.com"],
+  Kroger:["grocery","kroger.com"], Instacart:["grocery","instacart.com"],
+  Publix:["grocery","publix.com"], Safeway:["grocery","safeway.com"],
+  "Booking.com":["hotel","booking.com"], Expedia:["hotel","expedia.com"],
+  Marriott:["hotel","marriott.com"], Hilton:["hotel","hilton.com"],
+  Hyatt:["hotel","hyatt.com"], IHG:["hotel","ihg.com"],
+  "Hotels.com":["hotel","hotels.com"],
+  "American Airlines":["flight","aa.com"], Delta:["flight","delta.com"],
+  United:["flight","united.com"], Southwest:["flight","southwest.com"],
+  JetBlue:["flight","jetblue.com"], "Alaska Airlines":["flight","alaskaair.com"],
+  Target:["retail","target.com"], Walmart:["retail","walmart.com"],
+  Amazon:["marketplace","amazon.com"], Costco:["retail","costco.com"],
+  "Sam's Club":["retail","samsclub.com"], "Home Depot":["retail","homedepot.com"],
+  "Lowe's":["retail","lowes.com"], Chewy:["online","chewy.com"],
+  "Best Buy":["tech","bestbuy.com"], "Apple Store":["tech","apple.com"],
+  Dell:["onlinetech","dell.com"], Lenovo:["onlinetech","lenovo.com"],
+  Newegg:["onlinetech","newegg.com"], "B&H Photo":["tech","bhphotovideo.com"],
+  Spectrum:["broadband","spectrum.com"], Xfinity:["broadband","xfinity.com"],
+  "AT&T":["broadband","att.com"], Verizon:["broadband","verizon.com"],
+  Adobe:["software","adobe.com"], "Microsoft 365":["software","microsoft.com"],
+  Spotify:["software","spotify.com"], Netflix:["software","netflix.com"],
+  Uber:["ride","uber.com"], Lyft:["ride","lyft.com"],
+  DoorDash:["meal","doordash.com"], Grubhub:["meal","grubhub.com"]
+};

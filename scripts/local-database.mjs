@@ -6,6 +6,18 @@ export function localDatabase(path) {
   const initialized = connection.prepare("SELECT 1 FROM sqlite_master WHERE name = 'threads'").get();
   if (!initialized) connection.exec(readFileSync(new URL("../drizzle/0000_community.sql", import.meta.url), "utf8"));
 
+  connection.exec(readFileSync(new URL("../drizzle/0001_price_index.sql", import.meta.url), "utf8"));
+  if (!connection.prepare("SELECT 1 FROM sqlite_master WHERE name='price_feeds'").get()) {
+    connection.exec("BEGIN IMMEDIATE");
+    try {
+      if (!connection.prepare("SELECT 1 FROM sqlite_master WHERE name='price_feeds'").get())
+        connection.exec(readFileSync(new URL("../drizzle/0002_connected_feeds.sql", import.meta.url), "utf8"));
+      connection.exec("COMMIT");
+    } catch (error) {
+      connection.exec("ROLLBACK");
+      throw error;
+    }
+  }
   class Statement {
     constructor(sql, params = []) {
       this.sql = sql;

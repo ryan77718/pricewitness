@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Price companion</title><link rel="stylesheet" href="popup.css"></head>
+<body><h1>Price companion</h1><div id="paired" hidden><label id="choose" hidden>Paired feed<select id="feed-choice"></select></label><strong id="offer"></strong><p id="market"></p><p id="terms"></p>
+<button id="pick">Select a price on this tab</button><p>Select one USD price on the matching offer and confirm the amount. Changes to that price are shared for up to 15 minutes while the tab is visible. Stop before changing the offer or location.</p>
+<button class="secondary" id="stop" hidden>Stop sharing</button><button class="secondary" id="forget">Forget connection</button></div>
+<button class="secondary" id="another" hidden>Pair another feed</button><form id="pair"><label>Connection code<input type="password" id="code" required autocomplete="off"></label><button>Pair feed</button></form>
+<p id="status" role="status"></p><script type="module" src="popup.js"></script></body></html>

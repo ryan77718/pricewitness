@@ -8,21 +8,6 @@ function field(value,max,label,optional=false){
   return value.trim();
 }
 function identifier(value){if(typeof value!=="string" || !/^[a-zA-Z0-9-]{1,100}$/.test(value))throw new InputError("Invalid record.");return value}
-async function feed(db,owner){
-  const queries=[
-    db.prepare("SELECT * FROM threads ORDER BY created DESC"),
-    db.prepare("SELECT id,thread,alias,cents,context,seen,(owner=?) AS own FROM observations ORDER BY seen DESC,id").bind(owner),
-    db.prepare("SELECT id,thread,alias,body,created,(owner=?) AS own FROM comments ORDER BY created").bind(owner),
-    db.prepare("SELECT thread,SUM(CASE WHEN kind='like' THEN 1 ELSE 0 END) AS votes,MAX(CASE WHEN owner=? AND kind='like' THEN 1 ELSE 0 END) AS liked,MAX(CASE WHEN owner=? AND kind='save' THEN 1 ELSE 0 END) AS saved FROM reactions GROUP BY thread").bind(owner,owner)
-  ];
-  const [groups,observations,replies,activity]=(await db.batch(queries)).map(q=>q.results);
-  const threads=[...groups.map(t=>({...t,quotes:[],comments:[],votes:0,saved:false,liked:false})),...examples.map(t=>({...t,comments:[]}))];
-  const byId=new Map(threads.map(t=>[t.id,t]));
-  for(const q of observations)byId.get(q.thread)?.quotes.push(q);
-  for(const c of replies)byId.get(c.thread)?.comments.push(c);
-  for(const a of activity){const t=byId.get(a.thread);if(t)Object.assign(t,{votes:a.votes,saved:!!a.saved,liked:!!a.liked})}
-  return threads.filter(t=>t.quotes.length);
-}
 async function write(db,owner,b){
   const op=b.action;
   if(op==="remove-quote"||op==="remove-comment"){
@@ -47,6 +32,8 @@ async function write(db,owner,b){
     await db.prepare("INSERT OR IGNORE INTO comments(id,thread,owner,alias,body,created) VALUES(?,?,?,?,?,?)").bind(id,t,owner,alias,field(b.body,750,"comment"),now).run();return {thread:t};
   }
   if(op!=="quote"||example)throw new InputError("Start a new comparison to share a real price.");
+  if(t && (await db.prepare("SELECT offer_spec FROM threads WHERE id=?").bind(t).first())?.offer_spec)
+    throw new InputError("Use the local quote form to confirm the market and observation time.");
   const batch=[];
   if(!t){
     const title=field(b.title,100,"item"),merchant=field(b.merchant,60,"merchant"),variant=field(b.variant,180,"item details"),category=b.category,currency=b.currency;
@@ -65,7 +52,7 @@ async function write(db,owner,b){
 export async function communityApi(request,env){
   const owner=request.headers.get("oai-authenticated-user-id")||"";
   try{
-    if(request.method==="GET")return json({threads:await feed(env.DB,owner),signedIn:!!owner});
+    if(request.method==="GET")return json(await communityRead(env.DB,owner,request.url));
     if(request.method!=="POST")return json({error:"Method unavailable."},405);
     if(!owner)return json({error:"Sign in to contribute."},401);
     const origin=request.headers.get("origin");

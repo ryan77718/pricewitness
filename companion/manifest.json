@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "PriceWitness price companion",
+  "version": "1.0.0",
+  "description": "Send a price you select on a supported shopping or ride website to your own PriceWitness feed.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "optional_host_permissions": ["https://*/*", "http://127.0.0.1/*", "http://localhost/*"],
+  "action": {"default_popup": "popup.html", "default_title": "Share a price"},
+  "background": {"service_worker": "background.js", "type": "module"}
+}
