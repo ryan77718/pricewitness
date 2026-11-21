@@ -128,7 +128,11 @@ test("same local market, offer and window converge; retries and older events can
   assert.equal(item.count,2);assert.equal(item.plot.median,2112.5);
   assert.equal(item.market,"28205 → 28208 · On demand");
   assert.equal(item.quotes[0].channel,"Connected app");
-  assert.equal(item.quotes[0].cents,1800);assert.equal(item.quotes[0].observed_at,event("p2",1800,240000).observedAt);
+  // Other people see the hour; the contributor sees their own exact time.
+  const exact=event("p2",1800,240000).observedAt;
+  assert.equal(item.quotes[0].cents,1800);assert.ok(item.quotes[0].rounded);
+  assert.equal(item.quotes[0].observed_at,new Date(Math.floor(Date.parse(exact)/3600000)*3600000).toISOString());
+  assert.equal((await call("/api/community?mode=item&id="+thread,{owner:"a"})).item.quotes.find(x=>x.own).observed_at,exact);
   assert.ok(!JSON.stringify(item).includes(a.token));
   const {thread:manual}=await call("/api/feeds",{owner:"c",body:{action:"publish",spec:ride,context:"Signed out",...one}});
   assert.equal(manual,thread);

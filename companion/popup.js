@@ -2,7 +2,8 @@ const $=id=>document.getElementById(id);
 const status=message=>{$("status").textContent=message};
 const call=(action,data={})=>chrome.runtime.sendMessage({action,...data});
 async function render(){
-  const {feed,watch,choices}=await call("state");
+  const {feed,watch,choices,captures}=await call("state");
+  $("capture-count").textContent=String(captures||0);$("captures-box").hidden=!captures;
   $("paired").hidden=!feed;$("pair").hidden=!!feed;$("another").hidden=!feed;
   $("choose").hidden=choices.length<2;
   $("feed-choice").replaceChildren(...choices.map(x=>new Option(x.label,x.id,false,x.id===feed?.id)));
@@ -36,6 +37,20 @@ $("pick").onclick=async()=>{
     if(reply.error)throw Error(reply.error);
     window.close();
   }catch(e){status(e.message)}
+};
+$("export").onclick=async()=>{
+  const {captures}=await call("captures");
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(new Blob([JSON.stringify(captures,null,2)],{type:"application/json"}));
+  link.download="pricewitness-captures-"+new Date().toISOString().slice(0,10)+".json";
+  link.click();setTimeout(()=>URL.revokeObjectURL(link.href),10000);
+  status("Captures downloaded.");
+};
+let clearing=false;
+$("clear-captures").onclick=async()=>{
+  if(!clearing){clearing=true;$("clear-captures").textContent="Click again to delete";return}
+  clearing=false;$("clear-captures").textContent="Delete captures";
+  await call("clear-captures");status("Captures deleted from this browser.");await render();
 };
 $("stop").onclick=async()=>{await call("stop");status("Sharing stopped.");await render()};
 $("forget").onclick=async()=>{await call("forget");status("Connection removed from this browser.");await render()};

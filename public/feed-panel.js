@@ -1,4 +1,7 @@
 import {markets,marketLabel,usesOrigin,usesDestination,needsBranch} from "./markets.js";
+import {evidenceFields,readEvidence} from "./evidence-form.js";
+
+function currentTest(){try{return sessionStorage.getItem("pricewitness-test")||""}catch{return ""}}
 
 export function createFeedPanel({dialog,show,field,button,h,requireAccess,openResult}) {
   let generation=0;
@@ -44,7 +47,8 @@ export function createFeedPanel({dialog,show,field,button,h,requireAccess,openRe
        <form id="market-form">${fixed}
        ${field("Membership, discounts and fees","context",{value:raw.context,max:180,placeholder:"e.g. Standard account, no coupon"})}
        <div class="note-box"><strong>${h(policy.basis)} · USD</strong><div>${policy.minutes===1440?"UTC calendar-day":policy.minutes+"-minute"} comparison windows. Other shoppers can see the offer, area, time and account conditions.</div></div>
-       ${posting?'<div class="form-row">'+field("Price in USD","amount",{type:"number",value:raw.amount||"",extra:'min="0" max="999999999.99" step="0.01"'})+field("Time seen (your local time)","observed",{type:"datetime-local",value:localNow})+'</div>':""}
+       ${posting?'<div class="form-row">'+field("Price in USD","amount",{type:"number",value:raw.amount||"",extra:'min="0" max="999999999.99" step="0.01"'})+field("Time seen (your local time)","observed",{type:"datetime-local",value:localNow})+'</div>'+evidenceFields():""}
+       ${locked?(raw.campaign?'<div class="note-box"><strong>Price check '+h(raw.campaign)+'</strong><div>Your price joins this organized test.</div></div>':''):field("Price check code (optional)","campaign",{required:false,max:40,value:raw.campaign||currentTest(),placeholder:"Only if you joined an organized price check",extra:'pattern="[A-Za-z0-9][A-Za-z0-9\\-]{1,39}" autocomplete="off"'})}
        ${errorBox}<div class="form-actions">${back()}<button type="submit" class="primary">${posting?"Publish price":"Create connection"}</button></div></form>`,"market");
     const form=dialog.querySelector("form"),key=crypto.randomUUID();
     if(!locked) form.elements.fulfillment.onchange=()=>{
@@ -58,8 +62,8 @@ export function createFeedPanel({dialog,show,field,button,h,requireAccess,openRe
       submit.disabled=true;out.textContent="";
       try {
         const values=Object.fromEntries(new FormData(form));
-        const data={action:intent,spec:locked?spec:{...values,provider:spec.provider},context:values.context};
-        if(posting) Object.assign(data,{eventId:key,cents:Math.round(Number(values.amount)*100),observedAt:new Date(values.observed).toISOString()});
+        const data={action:intent,spec:locked?spec:{...values,provider:spec.provider},context:values.context,campaign:locked?raw.campaign||"":values.campaign||""};
+        if(posting) Object.assign(data,{eventId:key,cents:Math.round(Number(values.amount)*100),observedAt:new Date(values.observed).toISOString()},await readEvidence(form));
         const response=await api(data);
         if(!visible(form))return;
         if(posting) await openResult(response.thread);
@@ -129,7 +133,7 @@ ${h(JSON.stringify({eventId:"quote-001",observedAt:new Date().toISOString(),cent
     try{
       const {feeds}=await api();
       if(stamp!==generation||!visible(list))return;
-      list.innerHTML=feeds.length?feeds.map(f=>`<div class="linked-feed"><div><strong>${h(f.spec.provider)} · ${h(f.spec.offer)}</strong><div>${h(marketLabel(f.spec))}</div><small>${f.last_received?"Last price received "+h(new Date(f.last_received).toLocaleString()):"Waiting for first price"}</small></div>${button("disconnect-feed","Disconnect","text-btn",'data-feed="'+h(f.id)+'"')}</div>`).join(""):"<p>No connections yet. Choose an app above to connect your first feed.</p>";
+      list.innerHTML=feeds.length?feeds.map(f=>`<div class="linked-feed"><div><strong>${h(f.spec.provider)} · ${h(f.spec.offer)}</strong><div>${h(marketLabel(f.spec))}${f.campaign?" · Price check "+h(f.campaign):""}</div><small>${f.last_received?"Last price received "+h(new Date(f.last_received).toLocaleString()):"Waiting for first price"}</small></div>${button("disconnect-feed","Disconnect","text-btn",'data-feed="'+h(f.id)+'"')}</div>`).join(""):"<p>No connections yet. Choose an app above to connect your first feed.</p>";
       list.querySelectorAll("[data-feed]").forEach(b=>b.onclick=async()=>{
         b.disabled=true;
         try{await api({action:"disconnect",id:b.dataset.feed});if(visible(list))await open(provider);}

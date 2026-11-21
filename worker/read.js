@@ -13,6 +13,7 @@ async function allRows(statement) {
 }
 const metricsSQL = `
  (SELECT COUNT(*) FROM observations o WHERE o.thread=t.id) AS count,
+ (SELECT COUNT(DISTINCT owner) FROM observations o WHERE o.thread=t.id) AS shoppers,
  (SELECT MIN(cents) FROM observations o WHERE o.thread=t.id) AS low,
  (SELECT MAX(cents) FROM observations o WHERE o.thread=t.id) AS high,
  (SELECT MAX(seen) FROM observations o WHERE o.thread=t.id) AS lastSeen,
@@ -35,7 +36,7 @@ async function sampleSummaries(db, owner) {
   return examples.map(t=>{
     const {quotes,comments, ...base} = t;
     const {low,high}=spread(t);
-    return asSummary({...base, low, high, count:quotes.length, lastSeen:t.created.slice(0,10), replies:0, ...flags.get(t.id), ...counts.get(t.id)});
+    return asSummary({...base, low, high, count:quotes.length, shoppers:quotes.length, lastSeen:t.created.slice(0,10), replies:0, ...flags.get(t.id), ...counts.get(t.id)});
   });
 }
 function applySearch(params,owner) {
@@ -44,7 +45,7 @@ function applySearch(params,owner) {
   if(category && category!=="All") {where.push("t.category=?");args.push(category)}
   const terms=[...new Set(q.toLowerCase().split(/\s+/).filter(Boolean))];
   for (const term of terms) {
-    where.push("instr(lower(t.title||' '||t.merchant||' '||t.variant||' '||t.category||' '||t.market||' '||coalesce(json_extract(t.offer_spec,'$.productCode'),'')),lower(?))>0");
+    where.push("instr(lower(t.title||' '||t.merchant||' '||t.variant||' '||t.category||' '||t.market||' '||coalesce(json_extract(t.offer_spec,'$.productCode'),'')||' '||coalesce(t.campaign,'')),lower(?))>0");
     args.push(term);
   }
   if(view==="saved") {
@@ -128,18 +129,19 @@ async function getRecordPage(db, owner, id, kind, offset, sample, band=null) {
   }
   const query=kind==="comments"
     ? "SELECT id,alias,body,created,(owner=?) AS own FROM comments WHERE thread=? ORDER BY created DESC,id DESC LIMIT ? OFFSET ?"
-    : "SELECT id,alias,cents,context,seen,observed_at,channel,(owner=?) AS own FROM observations WHERE thread=?" +
+    : "SELECT id,alias,cents,context,seen,observed_at,channel,list_cents,fees_cents,total_cents,search_rank,notice,notice_text,conditions,shopper_state,tier,campaign,record_hash,(owner=?) AS own FROM observations WHERE thread=?" +
       (band ? " AND cents BETWEEN ? AND ?" : "") + " ORDER BY seen DESC,observed_at DESC,id DESC LIMIT ? OFFSET ?";
   const rows=await allRows(db.prepare(query).bind(owner,id,...(band||[]),RECORDS_PER_PAGE+1,offset));
-  return {rows:rows.slice(0,RECORDS_PER_PAGE),more:rows.length>RECORDS_PER_PAGE};
+  const page=rows.slice(0,RECORDS_PER_PAGE);
+  return {rows:kind==="comments"?page:page.map(publicSighting),more:rows.length>RECORDS_PER_PAGE};
 }
-async function endpointReports(db,t,sample) {
+async function endpointReports(db,owner,t,sample) {
   const prices = t.low === t.high ? [t.low] : [t.low,t.high];
   if (sample) return prices.map(cents => sample.quotes.find(q => q.cents === cents));
   const results = await db.batch(prices.map(cents => db.prepare(
-    "SELECT id,cents,context,seen,observed_at,channel,alias FROM observations WHERE thread=? AND cents=? ORDER BY seen DESC,observed_at DESC,id DESC LIMIT 1"
-  ).bind(t.id,cents)));
-  return results.map(result => result.results[0]).filter(Boolean);
+    "SELECT id,cents,context,seen,observed_at,channel,alias,(owner=?) AS own FROM observations WHERE thread=? AND cents=? ORDER BY seen DESC,observed_at DESC,id DESC LIMIT 1"
+  ).bind(owner,t.id,cents)));
+  return results.map(result => result.results[0]).filter(Boolean).map(publicSighting);
 }
 async function readItem(db,owner,id,includeRecords=true) {
   const sample=examples.find(e=>e.id===id);
@@ -149,13 +151,14 @@ async function readItem(db,owner,id,includeRecords=true) {
     EXISTS(SELECT 1 FROM reactions WHERE thread=t.id AND owner=? AND kind='like') AS liked
     FROM threads t WHERE id=?`).bind(owner,owner,id).first();
   if(!t||!t.count)throw new InputError("This comparison is no longer available.",404);
-  const [plot,edges,quotes,replies]=await Promise.all([
+  const [plot,edges,quotes,replies,evidence]=await Promise.all([
     sample?sampleDistribution(sample):realDistribution(db,t),
-    endpointReports(db,t,sample),
+    endpointReports(db,owner,t,sample),
     includeRecords && getRecordPage(db,owner,id,"sightings",0,sample),
-    includeRecords && getRecordPage(db,owner,id,"comments",0,sample)
+    includeRecords && getRecordPage(db,owner,id,"comments",0,sample),
+    sample?null:evidenceSummary(db,t)
   ]);
-  const summary={...asSummary(t),plot:{...plot,edges}};
+  const summary={...asSummary(t),plot:{...plot,edges},evidence};
   return includeRecords ? {...summary,quotes:quotes.rows,comments:replies.rows,moreQuotes:quotes.more,moreComments:replies.more} : summary;
 }
 async function communityRead(db,owner,url) {

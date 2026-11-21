@@ -290,3 +290,20 @@
 @media(max-width:850px){.mast .mine-nav {display:none}}
 @media(max-width:600px){.mast .feeds-nav {width:35px;justify-content:center}.feeds-nav span {display:none}}
 @media(max-width:420px){.provider-grid {grid-template-columns:repeat(2,minmax(0,1fr))}.market-areas {grid-template-columns:1fr}.market-areas .field:last-child:nth-child(3){grid-column:auto}}
+
+/* Evidence fields, badges and totals */
+.evidence-block {display:grid;gap:12px}
+.modal-body .evidence-more {margin-block:2px 0}
+.evidence-more[open] > summary {margin-bottom:10px}
+.setup-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.evidence-line {display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:5px;font-size:11px;color:var(--muted)}
+.evidence-facts {color:#4c5649}
+.notice-quote {font-style:italic;color:#5d4a2c}
+.tier-chip {font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.5px;border:1px solid #cbd0c1;border-radius:3px;padding:1px 5px;color:#4a544c;background:#f3f5ee}
+.tier-chip.tier-0 {background:transparent}
+.tier-chip.tier-2 {border-color:#9fb59a;background:#e6efe1}
+.fingerprint {font:10px var(--mono);color:#7a8277}
+.evidence-summary p {margin:0 0 4px}
+.evidence-summary p:last-child {margin:0}
+.site-foot a {color:inherit;font-size:12px}
+@media(max-width:420px){.setup-grid {grid-template-columns:1fr}}

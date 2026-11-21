@@ -57,7 +57,12 @@ async function recordLocalPrice(db, owner, spec, context, data, feed=null) {
   if (!Number.isSafeInteger(cents) || cents<0 || cents>99999999999) throw new InputError("Send the USD price in whole cents.");
   const now=new Date().toISOString(), time=Date.parse(observed);
   const source=feed?.id ?? "manual:"+owner;
-  const fingerprint=await hashText(JSON.stringify([cents,observed,spec,context]));
+  const evidence=evidenceInput(data);
+  const campaign=feed ? feed.campaign||"" : testCode(data.campaign);
+  if(campaign===null) throw new InputError("Use 2 to 40 letters, numbers or dashes for the price check code.");
+  // Connected apps and the browser companion send a page fingerprint; the website form sends a screenshot fingerprint.
+  const tier=evidence.proofHash ? (feed ? 2 : 1) : 0;
+  const fingerprint=await hashText(JSON.stringify([cents,observed,spec,context,evidence,campaign]));
   function receipt(row) {
     if (row.fingerprint!==fingerprint) throw new InputError("This event ID already has a different price or time.",409);
     return {thread:row.thread};
@@ -66,11 +71,16 @@ async function recordLocalPrice(db, owner, spec, context, data, feed=null) {
   const prior=await previous.first();
   if(prior) return receipt(prior);
   if (time>Date.now()+60000 || time<Date.now()-86400000) throw new InputError("Send a quote observed within the past 24 hours.");
-  const {minutes,category}=markets[spec.provider];
-  const period=new Date(Math.floor(time/(minutes*60000))*minutes*60000).toISOString();
+  const {minutes:windowMinutes,category}=markets[spec.provider];
   const normalized=Object.entries(spec).filter(([key])=>key!=="offer" || !spec.productCode).map(([,value])=>value.trim().replace(/\s+/g," ").toLowerCase());
-  const thread=await hashText(JSON.stringify(["local-usd-v1",...normalized,period]));
+  // Everyday reports share fixed clock windows. An organized price check is one comparison per offer and
+  // code, so two participants checking seconds apart never land on opposite sides of a window boundary.
+  const minutes=campaign ? 0 : windowMinutes;
+  const period=campaign ? new Date(Math.floor(time/60000)*60000).toISOString() : new Date(Math.floor(time/(minutes*60000))*minutes*60000).toISOString();
+  const thread=await hashText(JSON.stringify(campaign ? ["local-usd-test-v1",...normalized,campaign] : ["local-usd-v1",...normalized,period]));
   const record=await hashText(JSON.stringify(["local-sighting",owner,thread]));
+  const entry={id:record,thread,cents,evidence,campaign,observed,tier,received:now};
+  entry.hash=await recordFingerprint(entry);
   const batch=[];
   // The receipt and sighting commit together. Recheck revocation inside the same transaction.
   if (feed) {
@@ -82,12 +92,15 @@ async function recordLocalPrice(db, owner, spec, context, data, feed=null) {
   }
   const guard=" WHERE EXISTS(SELECT 1 FROM local_price_events WHERE source=? AND event_id=? AND fingerprint=?)";
   const guardArgs=[source,eventId,fingerprint];
-  batch.push(db.prepare(`INSERT OR IGNORE INTO threads(id,title,merchant,category,variant,currency,created,market,period_start,period_minutes,offer_spec)
-    SELECT ?,?,?,?,?,'USD',?,?,?,?,?`+guard).bind(thread,spec.offer,spec.provider,category,spec.variant,now,marketLabel(spec),period,minutes,JSON.stringify(spec),...guardArgs));
-  batch.push(db.prepare(`INSERT INTO observations(id,thread,owner,alias,cents,context,seen,observed_at,channel)
-    SELECT ?,?,?,'Anonymous shopper',?,?,?,?,?`+guard+`
+  batch.push(db.prepare(`INSERT OR IGNORE INTO threads(id,title,merchant,category,variant,currency,created,market,period_start,period_minutes,offer_spec,campaign)
+    SELECT ?,?,?,?,?,'USD',?,?,?,?,?,?`+guard).bind(thread,spec.offer,spec.provider,category,spec.variant,now,marketLabel(spec),period,minutes,JSON.stringify(spec),campaign||null,...guardArgs));
+  const updates=evidenceColumnNames.split(",").map(name=>name+"=excluded."+name).join(",");
+  batch.push(db.prepare(`INSERT INTO observations(id,thread,owner,alias,cents,context,seen,observed_at,channel,${evidenceColumnNames})
+    SELECT ?,?,?,'Anonymous shopper',?,?,?,?,?,${Array(14).fill("?").join()}`+guard+`
     ON CONFLICT(id) DO UPDATE SET cents=excluded.cents,context=excluded.context,seen=excluded.seen,
-    observed_at=excluded.observed_at,channel=excluded.channel WHERE excluded.observed_at>observations.observed_at`).bind(record,thread,owner,cents,context,observed.slice(0,10),observed,feed?"Connected app":"Shopper report",...guardArgs));
+    observed_at=excluded.observed_at,channel=excluded.channel,${updates} WHERE excluded.observed_at>observations.observed_at`)
+    .bind(record,thread,owner,cents,context,observed.slice(0,10),observed,feed?"Connected app":"Shopper report",...evidenceColumns(entry),...guardArgs));
+  batch.push(logEvidence(db,record));
   if(feed) {
     batch.push(db.prepare("UPDATE price_feeds SET last_received=? WHERE id=? AND token_hash=?").bind(now,feed.id,feed.token_hash));
   }
@@ -105,13 +118,13 @@ async function feedApi(request,env,path) {
       const feed=bearer && await db.prepare("SELECT * FROM price_feeds WHERE token_hash=?").bind(await hashText(bearer[1])).first();
       if (!feed) throw new InputError("Connection code is invalid or disconnected.",401);
       const spec=JSON.parse(feed.spec);
-      if(method==="GET") return json({id:feed.id,spec,context:feed.context,domain:markets[spec.provider].domain,basis:markets[spec.provider].basis,market:marketLabel(spec)});
+      if(method==="GET") return json({id:feed.id,spec,context:feed.context,campaign:feed.campaign||"",domain:markets[spec.provider].domain,basis:markets[spec.provider].basis,market:marketLabel(spec)});
       return json(await recordLocalPrice(db,feed.owner,spec,feed.context,await feedBody(request),feed));
     }
     const owner=request.headers.get("oai-authenticated-user-id");
     if(!owner) throw new InputError("Sign in to manage price feeds.",401);
     if(method==="GET") {
-      const rows=await allRows(db.prepare("SELECT id,spec,context,created,last_received FROM price_feeds WHERE owner=? AND token_hash IS NOT NULL ORDER BY created DESC").bind(owner));
+      const rows=await allRows(db.prepare("SELECT id,spec,context,campaign,created,last_received FROM price_feeds WHERE owner=? AND token_hash IS NOT NULL ORDER BY created DESC").bind(owner));
       return json({feeds:rows.map(row=>({...row,spec:JSON.parse(row.spec)}))});
     }
     const origin=request.headers.get("origin");
@@ -124,11 +137,13 @@ async function feedApi(request,env,path) {
     const spec=validateSpec(data.spec), context=field(data.context,180,"account and offer conditions");
     if(data.action==="publish") return json(await recordLocalPrice(db,owner,spec,context,data));
     if(data.action!=="connect") throw new InputError("Unknown action.");
+    const campaign=testCode(data.campaign);
+    if(campaign===null) throw new InputError("Use 2 to 40 letters, numbers or dashes for the price check code.");
     const id=crypto.randomUUID(),token="pv_"+Array.from(crypto.getRandomValues(new Uint8Array(32)),n=>n.toString(16).padStart(2,"0")).join("");
     const created=new Date().toISOString();
-    const result=await db.prepare(`INSERT INTO price_feeds(id,owner,spec,context,token_hash,created)
-      SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM price_feeds WHERE owner=? AND token_hash IS NOT NULL)<30 RETURNING id`)
-      .bind(id,owner,JSON.stringify(spec),context,await hashText(token),created,owner).run();
+    const result=await db.prepare(`INSERT INTO price_feeds(id,owner,spec,context,token_hash,created,campaign)
+      SELECT ?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM price_feeds WHERE owner=? AND token_hash IS NOT NULL)<30 RETURNING id`)
+      .bind(id,owner,JSON.stringify(spec),context,await hashText(token),created,campaign||null,owner).run();
     if (!result.results.length) throw new InputError("Disconnect an unused feed before creating another.",409);
     return json({id,token},201);
   } catch(error) {
