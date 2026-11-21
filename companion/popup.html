@@ -3,4 +3,5 @@
 <button id="pick">Select a price on this tab</button><p>Select one USD price on the matching offer and confirm the amount. Changes to that price are shared for up to 15 minutes while the tab is visible. Stop before changing the offer or location.</p>
 <button class="secondary" id="stop" hidden>Stop sharing</button><button class="secondary" id="forget">Forget connection</button></div>
 <button class="secondary" id="another" hidden>Pair another feed</button><form id="pair"><label>Connection code<input type="password" id="code" required autocomplete="off"></label><button>Pair feed</button></form>
+<details id="captures-box"><summary>Your page captures (<span id="capture-count">0</span>)</summary><p>Each shared price keeps a copy of the nearby page text in this browser. PriceWitness receives only its fingerprint. Download the copies and keep them: together with the fingerprint they show what the page said.</p><button class="secondary" id="export">Download captures</button><button class="secondary" id="clear-captures">Delete captures</button></details>
 <p id="status" role="status"></p><script type="module" src="popup.js"></script></body></html>

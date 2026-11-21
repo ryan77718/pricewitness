@@ -8,8 +8,10 @@ export default {
     }
     if (path === "/api/feeds" || path === "/api/price-events") return feedApi(request,env,path);
     if (path === "/api/community") return communityApi(request,env);
+    if (path === "/api/ledger") return ledgerApi(request,env);
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed",{status:405});
-    const asset = assets[path === "/" ? "index.html" : path.slice(1)];
+    const pages = {"/":"index.html","/methods":"methods.html"};
+    const asset = assets[pages[path] || path.slice(1)];
     if (!asset?.type) return new Response("Page not found",{status:404});
     const headers = {
       "Content-Type":asset.type, "Cache-Control":"no-cache", "ETag":asset.etag,

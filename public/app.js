@@ -3,6 +3,8 @@ import {catIcon,hydrateIcons,icon} from "./icons.js";
 import {createFeedPanel} from "./feed-panel.js";
 import {markets,windowLabel} from "./markets.js";
 import {mountPricePlot} from "./price-plot.js";
+import {evidenceFields,readEvidence,evidenceBadges,evidenceSummary} from "./evidence-form.js";
+import {testCode} from "./evidence.js";
 
 const $ = selector => document.querySelector(selector);
 const dialog = $("#dialog");
@@ -19,6 +21,8 @@ let boardRequest=0,detailRequest=0,featureRequest=0,searchTimer,toastTimer;
 const localToday=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
 const compareUrl=id=>{const u=new URL("/",location.origin);u.searchParams.set("item",id);return u};
 const findThread=id=>[activeItem,featureItem,...state.threads].find(t=>t?.id===id);
+function currentTest(){try{return sessionStorage.getItem("pricewitness-test")||""}catch{return ""}}
+const periodLabel=t=>t.campaign?"Price check "+t.campaign:windowLabel(t.period_start,t.period_minutes);
 function toast(message) {
   $("#toast").textContent=message;
   clearTimeout(toastTimer);
@@ -39,7 +43,7 @@ function localDetails(t) {
   if(!t.period_start)return "";
   const spec=JSON.parse(t.offer_spec);
   const product=spec.productCode ? '<span>UPC or SKU '+h(spec.productCode)+'</span>' : '';
-  return '<div class="market-facts"><strong>'+h(t.market)+'</strong>'+product+'<span>'+h(markets[spec.provider].basis)+' · '+h(windowLabel(t.period_start,t.period_minutes))+'</span></div>';
+  return '<div class="market-facts"><strong>'+h(t.market)+'</strong>'+product+'<span>'+h(markets[spec.provider].basis)+' · '+h(periodLabel(t))+'</span></div>';
 }
 function thumb(t) {
   const src=photos[t.id];
@@ -54,7 +58,7 @@ function row(t) {
     h(price(t.low,t.currency))+'<span class="range-dash"> – </span>'+h(price(t.high,t.currency));
   const gap=t.count<2?'<span class="reporter-note">Pending</span>':
     `<span class="gap-badge ${t.high===t.low?"flat":""}">${t.high>t.low?icon("up-right",12):""}${t.percent===null?h(price(t.high-t.low,t.currency)):t.percent+"%"}</span>`;
-  return `<tr><td>${button("detail",thumb(t)+`<span class="item-info"><span class="item-name">${h(t.title)}</span><span class="item-meta">${h(t.merchant)}${t.market?" · "+h(t.market):""}<span class="mobile-count">· ${t.count.toLocaleString()} seen</span>${t.examples?"<em>Example</em>":""}</span>${t.period_start?'<small class="item-period">'+h(windowLabel(t.period_start,t.period_minutes))+'</small>':""}</span>`,"item-link",attr(t.id))}</td>
+  return `<tr><td>${button("detail",thumb(t)+`<span class="item-info"><span class="item-name">${h(t.title)}</span><span class="item-meta">${h(t.merchant)}${t.market?" · "+h(t.market):""}<span class="mobile-count">· ${t.count.toLocaleString()} seen</span>${t.examples?"<em>Example</em>":""}</span>${t.period_start||t.campaign?'<small class="item-period">'+h(t.period_start?periodLabel(t):"Price check "+t.campaign)+'</small>':""}</span>`,"item-link",attr(t.id))}</td>
     <td class="range-data">${range}${t.currency==="USD"?"":` <small class="currency">${h(t.currency)}</small>`}</td>
     <td class="stat-n">${t.count.toLocaleString()}</td><td>${gap}</td><td class="save-cell">${mark(t)}</td></tr>`;
 }
@@ -196,8 +200,9 @@ dialog.addEventListener("click",e=>{
   if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close();
 });
 function sightingRow(x,t,removal="") {
-  const when=x.observed_at?new Date(x.observed_at).toLocaleString():dayLabel(x.seen);
-  return `<div class="sighting-row"><strong>${h(price(x.cents,t.currency))}</strong><div>${h(x.context)}<small>${h(x.alias)} · ${h(when)} ${x.channel?" · "+h(x.channel):""} ${removal}</small></div></div>`;
+  // Other shoppers' times arrive rounded to the hour.
+  const when=!x.observed_at?dayLabel(x.seen):x.rounded?new Date(x.observed_at).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"numeric"})+" hour":new Date(x.observed_at).toLocaleString();
+  return `<div class="sighting-row"><strong>${h(price(x.cents,t.currency))}</strong><div>${h(x.context)}<small>${h(x.alias)} · ${h(when)} ${x.channel?" · "+h(x.channel):""} ${removal}</small>${evidenceBadges(x,cents=>price(cents,t.currency))}</div></div>`;
 }
 function openBand(t,band) {
   const low=price(band.lo,t.currency),high=price(band.hi,t.currency);
@@ -254,10 +259,12 @@ function renderDetail(t,section) {
   activeItem=t;activeSection=section;formKey=crypto.randomUUID();
   const sample=t.examples?'<span class="example-chip">Example data</span>':"";
   const note=t.examples?"Illustrative prices and conditions. Start a real comparison to collect shopper reports.":"Check the dates, fees, and eligibility for each offer. These prices were reported by shoppers.";
-  show(t.title,`<div class="detail-meta"><span class="pill">${h(t.category)}</span> · ${h(t.merchant)} · ${h(t.currency)} ${sample}</div><p>${h(t.variant)}</p>${localDetails(t)}
+  const shoppers=t.shoppers!=null&&!t.examples?` · ${t.count.toLocaleString()} sighting${t.count===1?"":"s"} from ${t.shoppers.toLocaleString()} shopper${t.shoppers===1?"":"s"}`:"";
+  const test=t.campaign&&!t.period_start?`<div class="market-facts"><strong>Price check ${h(t.campaign)}</strong><span>Reports from one organized test, kept apart from everyday reports.</span></div>`:"";
+  show(t.title,`<div class="detail-meta"><span class="pill">${h(t.category)}</span> · ${h(t.merchant)} · ${h(t.currency)}${shoppers} ${sample}</div><p>${h(t.variant)}</p>${localDetails(t)}${test}${evidenceSummary(t.evidence)}
     <div class="detail-plot" id="detail-plot"></div>
     <div class="detail-tools">${button(t.examples?"start-real":"add-quote",icon("plus",14)+(t.examples?"Start a real comparison":"Add your price"),"primary",attr(t.id))}${t.offer_spec?button("connect-offer","Connect this offer","small-btn",attr(t.id)):""}${mark(t,true)}${button("like",icon("thumb",14)+"Helpful"+(t.votes?" "+t.votes:""),"small-btn",attr(t.id)+' aria-pressed="'+!!t.liked+'"')}${button("copy-link",icon("link",14)+"Copy link","small-btn",attr(t.id))}</div>
-    <p class="note-box">${h(t.period_start?"Each shopper contributes their latest price in this window. Check the route or branch, fees and account conditions before drawing conclusions.":note)}</p><div id="record-tabs" class="detail-tabs"></div><div id="records"></div>`,"detail");
+    <p class="note-box">${h(t.period_start?"Each shopper contributes their latest price in this "+(t.campaign?"price check":"window")+". Check the route or branch, fees and account conditions before drawing conclusions.":note)}</p><div id="record-tabs" class="detail-tabs"></div><div id="records"></div>`,"detail");
   mountPricePlot($("#detail-plot"),t.plot,band=>openBand(t,band));
   history.replaceState(null,"",compareUrl(t.id));renderRecords();
 }
@@ -284,7 +291,7 @@ function profile() {
 }
 function field(label,name,opts={}){const {type="text",value="",placeholder="",max=100,required=true,extra=""}=opts;return '<label class="field">'+h(label)+'<input type="'+type+'" name="'+name+'" '+(required?"required ":"")+'maxlength="'+max+'" value="'+h(value)+'" placeholder="'+h(placeholder)+'" '+extra+'></label>'}
 function select(label,name,arr,selected){return '<label class="field">'+h(label)+'<select name="'+name+'">'+arr.map(c=>'<option '+(c===selected?"selected":"")+'>'+h(c)+'</option>').join("")+'</select></label>'}
-function quoteFields(n,label){return '<fieldset><legend>'+h(label)+'</legend><div class="field-set"><div class="form-row">'+field("Price shown","amount"+n,{type:"number",placeholder:"0.00",extra:'min="0" max="999999999.99" step="0.01"'})+field("Date seen","seen"+n,{type:"date",value:localToday(),extra:'max="'+localToday()+'"'})+'</div>'+field("Account and offer context","context"+n,{max:180,placeholder:"e.g. Signed in, mobile app, tax included"})+'</div></fieldset>'}
+function quoteFields(n,label){return '<fieldset><legend>'+h(label)+'</legend><div class="field-set"><div class="form-row">'+field("Price shown","amount"+n,{type:"number",placeholder:"0.00",extra:'min="0" max="999999999.99" step="0.01"'})+field("Date seen","seen"+n,{type:"date",value:localToday(),extra:'max="'+localToday()+'"'})+'</div>'+field("Time seen (optional)","time"+n,{type:"time",required:false})+field("Account and offer context","context"+n,{max:180,placeholder:"e.g. Signed in, mobile app, tax included"})+evidenceFields(String(n))+'</div></fieldset>'}
 function requireAccess(){
  if(!state.ready){toast("The feed is connecting. Try again in a moment.");return false}
  if(state.signed)return true;
@@ -292,15 +299,15 @@ function requireAccess(){
 }
 function savedAlias(){try{return localStorage.getItem("pricewitness-alias")||""}catch{return ""}}
 function share(t=null,append=false){
- if(append && t?.offer_spec)return feedPanel.compose(JSON.parse(t.offer_spec),"publish",true);
+ if(append && t?.offer_spec)return feedPanel.compose({...JSON.parse(t.offer_spec),campaign:t.campaign||""},"publish",true);
  if(!requireAccess())return;
  formKey=crypto.randomUUID();
- const base=append?'<div class="note-box"><strong>'+h(t.title)+'</strong><div class="form-note">'+h(t.merchant)+' · '+h(t.variant)+' · '+h(t.currency)+'</div></div>':'<div class="form-row">'+field("Retailer or provider","merchant",{max:60,value:t?.merchant||"",placeholder:"e.g. Amazon"})+select("Category","category",categories,t?.category||"Retail")+'</div>'+field("Product or service","title",{value:t?.title||"",placeholder:"e.g. Sony WH-1000XM5 headphones"})+field("Details that identify the same offer","variant",{max:180,value:t?.variant||"",placeholder:"Model and seller, or flight number, date and fare class"})+select("Currency","currency",currencies,t?.currency||"USD");
+ const base=append?'<div class="note-box"><strong>'+h(t.title)+'</strong><div class="form-note">'+h(t.merchant)+' · '+h(t.variant)+' · '+h(t.currency)+'</div></div>':'<div class="form-row">'+field("Retailer or provider","merchant",{max:60,value:t?.merchant||"",placeholder:"e.g. Amazon"})+select("Category","category",categories,t?.category||"Retail")+'</div>'+field("Product or service","title",{value:t?.title||"",placeholder:"e.g. Sony WH-1000XM5 headphones"})+field("Details that identify the same offer","variant",{max:180,value:t?.variant||"",placeholder:"Model and seller, or flight number, date and fare class"})+select("Currency","currency",currencies,t?.currency||"USD")+field("Price check code (optional)","campaign",{required:false,max:40,value:currentTest(),placeholder:"Only if you joined an organized price check",extra:'pattern="[A-Za-z0-9][A-Za-z0-9\\-]{1,39}" autocomplete="off"'});
  show(append?"Add your price":"Share a price",'<p class="side-sub">Share only what another shopper needs to compare the offer.</p>'+(!append?button("feeds","Compare a local app price","small-btn"):"")+'<form id="quote-form" '+(append?'data-thread="'+h(t.id)+'"':"")+'>'+base+quoteFields(1,"Your price sighting")+'<div id="second-quote">'+button("second-quote",icon("plus",14)+" Add a second price (optional)","text-btn")+'</div>'+field("Public alias (optional)","alias",{required:false,max:32,value:savedAlias(),placeholder:"Anonymous shopper"})+'<span class="form-note">Leave out names, order numbers, and account details.</span><div class="error-text" role="alert"></div><div class="form-actions">'+button("close","Cancel","small-btn")+'<button class="primary" type="submit">Publish sighting '+icon("arrow-right",15)+'</button></div></form>',"share");
 }
 const information={
- how:["How PriceWitness works",'<ol class="privacy-list"><li><strong>Find the same offer.</strong> Search for a product, flight, room, or service. Match the seller, model, dates, and terms.</li><li><strong>Share what you saw.</strong> Enter a price, currency, date, and the account or offer conditions. One sighting is enough to start.</li><li><strong>Compare the details.</strong> The index shows the lowest and highest recorded prices. The percentage gap is the difference divided by the lowest price.</li></ol><p>Promotions, inventory, taxes, and timing can all affect a quote. A difference alone cannot establish why a price changed.</p><p>Offers marked “Example” use illustrative prices. Real sightings are collected in separate comparisons.</p>'],
- privacy:["Privacy",'<p>PriceWitness asks for the price you saw and the conditions that help others compare it. Local app feeds publish the ZIP areas, branch, offer, account conditions, price and observation time you choose. The browser companion sends amounts from a price you select. Your merchant credentials stay with the merchant.</p><h3>What other shoppers see</h3><p>Shared prices, dates, offer details, comments, and the alias you choose. Leaving the alias blank publishes as Anonymous shopper.</p><h3>What the app stores</h3><p>A site-specific sign-in identifier connects your posts, helpful votes, and private watchlist. The app does not store your sign-in email or full name. A preferred alias can be saved on this device.</p><p>You can remove your own price sightings and comments from a comparison. Disconnecting a feed stops future submissions. Previously shared prices remain until you remove them. This site uses no advertising pixels or third-party analytics scripts.</p>'],
+ how:["How PriceWitness works",'<ol class="privacy-list"><li><strong>Find the same offer.</strong> Search for a product, flight, room, or service. Match the seller, model, dates, and terms.</li><li><strong>Share what you saw.</strong> Enter a price, currency, date, and the account or offer conditions. One sighting is enough to start.</li><li><strong>Compare the details.</strong> The index shows the lowest and highest recorded prices. The percentage gap is the difference divided by the lowest price.</li></ol><p>Promotions, inventory, taxes, and timing can all affect a quote. A difference alone cannot establish why a price changed.</p><p>Offers marked “Example” use illustrative prices. Real sightings are collected in separate comparisons.</p><p><a href="/methods">Read the full methods and data dictionary</a>: how prices are matched, what each field means, how records are fingerprinted and what the data cannot show.</p>'],
+ privacy:["Privacy",'<p>PriceWitness asks for the price you saw and the conditions that help others compare it. Local app feeds publish the ZIP areas, branch, offer, account conditions, price and observation time you choose. The browser companion sends amounts from a price you select. Your merchant credentials stay with the merchant.</p><h3>What other shoppers see</h3><p>Shared prices, dates, offer details, comments, and the alias you choose. Leaving the alias blank publishes as Anonymous shopper.</p><h3>What the app stores</h3><p>A site-specific sign-in identifier connects your posts, helpful votes, and private watchlist. The app does not store your sign-in email or full name. A preferred alias can be saved on this device.</p><h3>What stays private</h3><p>Other shoppers see the hour a price was seen, not the minute. Your setup answers (signed in, device, where you were) and your state are never shown one report at a time; they appear only as totals once at least three people have reported the same offer. Screenshots and browser page captures never leave your device: only a digital fingerprint is sent. The app does not record your internet (IP) address with your reports.</p><p>You can remove your own price sightings and comments from a comparison. Disconnecting a feed stops future submissions. Previously shared prices remain until you remove them. A removed report\'s fingerprint stays in the public daily fingerprint list; the fingerprint alone reveals nothing about you or the price. This site uses no advertising pixels or third-party analytics scripts. <a href="/methods#privacy">More in the methods</a>.</p>'],
  guidelines:["Community guidelines",'<ul class="privacy-list"><li>Post prices you actually saw. Add the date, seller, fees, membership offer, and exact product or itinerary where relevant.</li><li>Keep comparisons like-for-like. Start a separate thread for another currency, seller, product variant, or fare class.</li><li>Describe what you observed. Avoid attributing a difference to personal characteristics without evidence.</li><li>Protect everyone’s privacy. Leave out personal names, exact home addresses, account numbers, and order identifiers.</li><li>Keep discussions focused on the offer and treat other shoppers with respect.</li></ul>']
 };
 
@@ -401,8 +408,10 @@ document.addEventListener("submit",async e=>{
   submit.disabled=true;const error=form.querySelector(".error-text");error.textContent="";
   try{
     if(form.id==="quote-form"){
-      const quote=n=>({cents:Math.round(Number(values["amount"+n])*100),context:values["context"+n],seen:values["seen"+n]});
-      const result=await request(null,{action:"quote",key:formKey,thread:form.dataset.thread||null,title:values.title,merchant:values.merchant,category:values.category,variant:values.variant,currency:values.currency,alias:values.alias,quotes:values.amount2===undefined?[quote(1)]:[quote(1),quote(2)]});
+      const quote=async n=>({cents:Math.round(Number(values["amount"+n])*100),context:values["context"+n],seen:values["seen"+n],
+        observedAt:values["time"+n]?new Date(values["seen"+n]+"T"+values["time"+n]).toISOString():"",...await readEvidence(form,String(n))});
+      const quotes=values.amount2===undefined?[await quote(1)]:[await quote(1),await quote(2)];
+      const result=await request(null,{action:"quote",key:formKey,thread:form.dataset.thread||null,title:values.title,merchant:values.merchant,category:values.category,variant:values.variant,currency:values.currency,alias:values.alias,campaign:values.campaign||"",quotes});
       await Promise.all([refresh(),refreshFeature()]);await openDetail(result.thread);toast("Price sighting published.");
     } else {
       const id=activeItem.id;
@@ -445,6 +454,12 @@ hydrateIcons();
 renderShell();
 await Promise.all([refresh(),refreshFeature()]);
 const requested=new URL(location.href).searchParams.get("item");
+const joined=testCode(new URL(location.href).searchParams.get("test"));
+if(joined){
+  try{sessionStorage.setItem("pricewitness-test",joined)}catch{}
+  state.query=joined;$("#search-term").value=joined;await refresh();
+  toast("Price check "+joined+": prices you report are grouped for this test.");
+}
 const shared=new URLSearchParams(location.hash.slice(1));
 if(shared.get("share")==="1") {
   const provider=shared.get("provider"),cents=shared.get("cents");

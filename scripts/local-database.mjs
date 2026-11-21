@@ -18,6 +18,17 @@ export function localDatabase(path) {
       throw error;
     }
   }
+  if (!connection.prepare("SELECT 1 FROM sqlite_master WHERE name='evidence_log'").get()) {
+    connection.exec("BEGIN IMMEDIATE");
+    try {
+      if (!connection.prepare("SELECT 1 FROM sqlite_master WHERE name='evidence_log'").get())
+        connection.exec(readFileSync(new URL("../drizzle/0003_evidence.sql", import.meta.url), "utf8"));
+      connection.exec("COMMIT");
+    } catch (error) {
+      connection.exec("ROLLBACK");
+      throw error;
+    }
+  }
   class Statement {
     constructor(sql, params = []) {
       this.sql = sql;

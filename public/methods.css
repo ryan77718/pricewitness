@@ -1,0 +1,23 @@
+.back-link {font-size:13px;font-weight:650;color:var(--ink)}
+.methods {max-width:760px;margin:0 auto;padding:34px 20px 50px;line-height:1.6}
+.methods h1 {font:400 clamp(40px,6vw,58px)/1 var(--serif);letter-spacing:-2px}
+.methods h2 {font:650 26px/1.15 var(--display);letter-spacing:-.8px;margin:40px 0 10px;scroll-margin-top:16px}
+.methods p, .methods li {font-size:15px}
+.methods p {margin:0 0 12px}
+.methods ul, .methods ol {padding-left:21px;margin:0 0 12px}
+.methods li {margin-bottom:7px}
+.methods code {font:13px var(--mono);background:#eef0e8;padding:1px 4px;border-radius:3px;overflow-wrap:anywhere}
+.methods .lede {font-size:17px;color:#3c463c;margin-top:14px}
+.methods table {width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:14px}
+.methods caption {text-align:left;font-weight:650;margin-bottom:6px}
+.methods th, .methods td {text-align:left;vertical-align:top;padding:8px 8px 8px 0;border-bottom:1px solid var(--line)}
+.methods thead th {font:600 10px var(--mono);text-transform:uppercase;letter-spacing:1px;color:#646e65}
+.methods th.group {font:650 13px var(--sans);padding-top:16px;color:var(--ink)}
+.methods .dictionary td:first-child {width:28%}
+.methods .dictionary td:last-child {width:20%;color:var(--muted)}
+.toc {display:flex;flex-wrap:wrap;gap:6px 14px;margin:18px 0 6px;padding:12px 0;border-block:1px solid var(--line);font-size:13px}
+.toc a {color:var(--burnt)}
+.planned {font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.5px;border:1px solid #d8b99d;color:#93502b;border-radius:3px;padding:0 4px;margin-left:4px}
+.ledger {margin-top:12px}
+.site-foot a {color:inherit;margin-left:14px}
+@media (max-width:560px) {.methods .dictionary td:first-child {width:auto}.methods table {font-size:13px}}

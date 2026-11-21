@@ -30,9 +30,25 @@ A comparison matches the retailer, item, variant or itinerary, category, and cur
 
 The application stores a site-specific identity for ownership and private saves. Public rows show the contributor's chosen alias. It does not request retailer credentials or use external analytics scripts.
 
+### Evidence, privacy and price checks
+
+The public [methods page](public/methods.html) (`/methods`) explains matching, every stored field, evidence levels, fingerprints, privacy rules and the limits of the data in plain language. Keep it in step with the code.
+
+Every sighting can carry optional evidence: the crossed-out "was" price, checkout fees and total, position in search results, whether the page showed a personalized-price notice (and its wording), the shopper's setup (signed in, member, device, app or website, where they were, seen before) and their state. The option lists live in `public/evidence.js` and are shared by the forms and the Worker. Setup answers and state are never shown one report at a time; totals appear once three different shoppers report the same offer. Other people see sighting times rounded to the hour.
+
+Each stored sighting gets a SHA-256 record fingerprint (recipe in `worker/evidence.js` and on the methods page) that is appended to a public daily list at `GET /api/ledger` (`?day=YYYY-MM-DD&format=text` for the plain list; its SHA-256 is the day's root). Screenshots are fingerprinted in the shopper's browser and never uploaded. The browser companion fingerprints the page text around the selected price and keeps that text in the extension's local storage, where the shopper can download it.
+
+To stamp a completed day's list with two RFC 3161 timestamp services, run `node scripts/stamp-ledger.mjs https://your-site.example [YYYY-MM-DD]`; it writes `ledger/<day>.txt` and `.tsr` receipts to commit. Add `--no-stamp` to save the list without contacting the services.
+
+A price check code (for example `clt-grocery-1`) groups reports from one organized test into their own comparisons, with no clock windows. Volunteers can open `/?test=clt-grocery-1` to have the code filled in. Connected feeds take the code when they are created.
+
 ## Status
 
 PriceWitness is an early prototype. It runs locally and has no public users yet. Sign-in currently relies on the identity supplied by the hosting platform, and the browser companion is loaded as an unpacked extension. Expect things to change.
+
+## Contact
+
+For questions, press, funding and partnerships, email [price_witness@outlook.com](mailto:price_witness@outlook.com).
 
 ## Reporting a security or privacy problem
 

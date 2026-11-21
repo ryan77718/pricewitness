@@ -17,6 +17,11 @@ async function upstream(pair,data) {
   if(!response.ok)throw Error(result.error||"The feed could not receive this request.");
   return result;
 }
+// Page text behind each fingerprint stays in this browser so the shopper can prove what they saw.
+async function keepCapture(entry) {
+  const {captures=[]}=await chrome.storage.local.get("captures");
+  await chrome.storage.local.set({captures:[entry,...captures].slice(0,200)});
+}
 async function stopWatch(watch) {
   if(!watch)return;
   await chrome.storage.session.remove("watch");
@@ -30,6 +35,7 @@ async function handle(message,sender) {
   if(sender.url===popupURL){
     switch(message.action){
       case "state": return {feed:pair?.feed,watch:watch?.until>Date.now()?watch:null,
+        captures:((await chrome.storage.local.get("captures")).captures||[]).length,
         choices:pairs.map(p=>({id:p.id,label:p.feed.spec.provider+" · "+p.feed.spec.offer+" · "+p.feed.market}))};
       case "choose":{
         if(!pairs.some(p=>p.id===message.id))throw Error("Feed unavailable.");
@@ -49,6 +55,8 @@ async function handle(message,sender) {
         await chrome.storage.local.set({pairs:remaining,selectedId:remaining[0]?.id??null});return {};
       }
       case "stop":await stopWatch(watch);return {};
+      case "captures":return {captures:(await chrome.storage.local.get("captures")).captures||[]};
+      case "clear-captures":await chrome.storage.local.remove("captures");return {};
       case "pick":{
         if(!pair)throw Error("Pair a feed first.");
         const tab=await chrome.tabs.get(message.tabId);
@@ -66,8 +74,13 @@ async function handle(message,sender) {
   if(!pair||!watch||sender.tab?.id!==watch.tabId||sender.frameId!==0||message.watchId!==watch.id||!onDomain(sender.url,pair.feed.domain))throw Error("Sharing has ended.");
   if(message.action==="finished"){await stopWatch(watch);return {}}
   if(message.action!=="capture"||watch.until<=Date.now())throw Error("Sharing has ended.");
-  const {eventId,observedAt,cents}=message.event;
-  return upstream(pair,{eventId,observedAt,cents});
+  const {eventId,observedAt,cents,notice,proofHash}=message.event;
+  const device=globalThis.navigator?.userAgentData?.mobile?"phone":"computer";
+  const result=await upstream(pair,{eventId,observedAt,cents,notice,proofHash,conditions:{surface:"website",device}});
+  await keepCapture({observedAt,cents,notice,proofHash,provider:pair.feed.spec.provider,offer:pair.feed.spec.offer,market:pair.feed.market,
+    campaign:pair.feed.campaign||"",url:String(message.page?.url||"").slice(0,500),text:String(message.page?.snippet||"").slice(0,1500),
+    recipe:'SHA-256 of JSON ["pw-page-v1", url, observedAt, cents, text]'});
+  return result;
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   handle(message,sender).then(respond,e=>respond({error:e.message||"Feed unavailable."}));

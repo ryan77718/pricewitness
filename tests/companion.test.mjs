@@ -47,7 +47,7 @@ test("paired companion requires price confirmation and sends only changing visib
     storage:{session:storage(),local:storage()},runtime:{getURL:file=>"chrome-extension://test/"+file,onMessage:messages},
     tabs:{get:async()=>({id:42,url:activeUrl}),onUpdated:listener(),onRemoved:listener(),sendMessage:async(id,m)=>pageMessages.emit(m)},
     scripting:{executeScript:async({func,args})=>{
-      runInNewContext("("+func.toString()+")(...args)",{args,document,HTMLElement:Element,crypto,location:{href:activeUrl},
+      runInNewContext("("+func.toString()+")(...args)",{args,document,HTMLElement:Element,crypto,TextEncoder,location:{href:activeUrl},
         setInterval:fn=>{tick=fn;return 1},clearInterval:()=>{},setTimeout:()=>{},
         chrome:{runtime:{onMessage:pageMessages,sendMessage:m=>(completion=send(m,page))}}});
     }}
@@ -67,6 +67,8 @@ test("paired companion requires price confirmation and sends only changing visib
   const controls=document.documentElement.children[0].root.children[0].children;
   const confirm=controls.find(e=>e.textContent==="Start sharing");assert.ok(!confirm.hidden);
   confirm.onclick({isTrusted:true});
+  // The page fingerprint is computed before the first price leaves the tab.
+  while(!completion)await new Promise(resolve=>setImmediate(resolve));
   const {thread}=await completion;
   assert.ok(thread);
   await tick();
@@ -75,7 +77,15 @@ test("paired companion requires price confirmation and sends only changing visib
   await tick();assert.equal(transmissions.length,1);
   document.hidden=false;await tick();
   assert.deepEqual(transmissions.map(x=>x.cents),[1240,1305]);
-  assert.deepEqual(Object.keys(transmissions[1]).sort(),["cents","eventId","observedAt"]);
+  assert.deepEqual(Object.keys(transmissions[1]).sort(),["cents","conditions","eventId","notice","observedAt","proofHash"]);
+  // Only a fingerprint of the page text is sent; the text itself stays in the companion's local storage.
+  assert.match(transmissions[1].proofHash,/^[a-f0-9]{64}$/);
+  assert.ok(!transmissions.some(x=>JSON.stringify(x).includes("$13.05")));
+  const {captures}=await send({action:"captures"},popup);
+  assert.equal(captures.length,2);assert.equal(captures[0].cents,1305);assert.equal(captures[0].text,"$13.05");
+  const {createHash}=await import("node:crypto");
+  assert.equal(createHash("sha256").update(JSON.stringify(["pw-page-v1",captures[0].url,captures[0].observedAt,captures[0].cents,captures[0].text])).digest("hex"),captures[0].proofHash);
+  assert.equal((await send({action:"state"},popup)).captures,2);
   const item=await (await worker.fetch(new Request("https://price.test/api/community?mode=item&id="+thread),{DB})).json();
   assert.equal(item.item.count,1);assert.equal(item.item.high,1305);
   node.isConnected=false;await tick();await completion;

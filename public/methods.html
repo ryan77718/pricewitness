@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#faf9f5">
+  <meta name="description" content="How PriceWitness matches price reports, what every field means, how records are fingerprinted, what stays private and what the data cannot show.">
+  <title>PriceWitness — Methods and data</title>
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/methods.css">
+</head>
+<body>
+<header class="mast"><div class="wrap mast-inner">
+  <a class="brand" href="/" aria-label="PriceWitness home"><img src="/favicon.svg" width="35" height="33" alt=""><span>PriceWitness</span></a>
+  <a class="back-link" href="/">Back to prices</a>
+</div></header>
+<main class="methods">
+  <h1>Methods and data</h1>
+  <p class="lede">PriceWitness collects the prices real shoppers were shown for the same offer, so differences that companies normally keep private can be seen side by side. This page explains how reports are matched, what each field means, how records are protected from tampering, what stays private and what the data can and cannot show. It is written for shoppers, reporters, researchers and regulators alike.</p>
+  <nav class="toc" aria-label="On this page"><a href="#records">What a report is</a><a href="#matching">Matching</a><a href="#reading">Reading a comparison</a><a href="#price-checks">Price checks</a><a href="#tiers">Evidence levels</a><a href="#fingerprints">Fingerprints</a><a href="#privacy">Privacy</a><a href="#dictionary">Data dictionary</a><a href="#wording">Wording and corrections</a><a href="#limits">Limits</a></nav>
+
+  <section id="records">
+    <h2>What a report is</h2>
+    <p>A <strong>sighting</strong> is one price one shopper saw for one offer at one time. Each sighting can carry five layers of information:</p>
+    <ol>
+      <li><strong>The offer and the moment.</strong> Retailer, exact product or itinerary, store or route, how it is fulfilled, and when the price was seen.</li>
+      <li><strong>The full price.</strong> The price shown, plus any crossed-out “was” price, fees added at checkout, the checkout total and the item's position in search results. These catch fake discounts, late-added fees and steering, not only different prices.</li>
+      <li><strong>The notice.</strong> Whether the page said the price was personalized or set by an algorithm, where that notice appeared and its exact wording. Several laws now turn on this, including New York's algorithmic pricing disclosure law.</li>
+      <li><strong>The shopper's setup.</strong> Signed in or not, member or not, device, app or website, where the shopper was and whether they had looked at the item before. Every answer is optional.</li>
+      <li><strong>Proof.</strong> An evidence level and a digital fingerprint of the record (see below).</li>
+    </ol>
+    <p>Reports arrive four ways: typed into the website, shared from a phone's share menu, captured by the PriceWitness browser companion when a shopper clicks a price, or sent by an app the shopper connected. The route is recorded with each sighting.</p>
+  </section>
+
+  <section id="matching">
+    <h2>How offers are matched</h2>
+    <p>Two prices are only compared when they are for the same thing. A comparison matches the retailer, the item, variant or itinerary, the category and the currency. Local offers add sector rules:</p>
+    <ul>
+      <li><strong>Groceries and electronics:</strong> UPC or retailer SKU plus size, condition, seller and fulfillment, in the same store or shipping area, within the same UTC day.</li>
+      <li><strong>Hotels:</strong> property, room type, cancellation and meal terms, stay dates, number of adults and storefront country, in 30-minute windows.</li>
+      <li><strong>Flights:</strong> marketing flight number, airports, date, cabin, fare brand, baggage and storefront country, in 15-minute windows.</li>
+      <li><strong>Rides:</strong> pickup and drop-off area, ride type and route landmarks, in 15-minute windows. <strong>Delivery:</strong> restaurant branch, basket and destination, in 30-minute windows.</li>
+      <li><strong>Broadband and subscriptions:</strong> plan, service ZIP or billing term, and price stage (introductory, standard, renewal or retention), within the same UTC day.</li>
+    </ul>
+    <p>Each shopper counts once per local comparison: a newer price from the same shopper replaces their older one, so one person cannot outweigh others. Examples on the site are clearly labeled and are never mixed with real sightings.</p>
+  </section>
+
+  <section id="reading">
+    <h2>Reading a comparison</h2>
+    <p>Each comparison shows the number of sightings and of different shoppers, the lowest, highest and middle (median) price, and the <strong>spread</strong>: the highest price minus the lowest, divided by the lowest. You can also enter your own quote privately to see how many sightings were cheaper; your quote stays on your device.</p>
+    <p>A spread on its own shows that different prices were seen. It does not show why. Prices also move for ordinary reasons: stock running out, a sale starting, a fare class selling out, a different seller winning the listing. Researchers separate these with a simple rule: <em>difference minus noise equals personalization</em>. They run two identical “control” checks at the same moment to measure ordinary noise, and count only the gap beyond that noise. PriceWitness's organized price checks are designed to make that kind of test possible.</p>
+  </section>
+
+  <section id="price-checks">
+    <h2>Organized price checks</h2>
+    <p>A <strong>price check</strong> is a scheduled test: a group of volunteers looks up the same offers at the same time and reports what they see. Reports carry a short <strong>price check code</strong> (for example <code>clt-grocery-1</code>) and are kept in their own comparisons, separate from everyday reports. Within a price check, all prices for the same offer land in one comparison no matter how the clock windows fall, and the comparison shows how many minutes apart the prices were seen.</p>
+    <p>A good price check holds everything constant except one thing. Some pairs of volunteers use identical setups (the control); other pairs differ in exactly one way, such as signed in versus signed out, member versus guest, or app versus website. The setup questions on every report exist so these comparisons can be made afterward. Volunteers join by opening a link such as <code>/?test=clt-grocery-1</code>; the code is then filled in on their reports.</p>
+  </section>
+
+  <section id="tiers">
+    <h2>Evidence levels</h2>
+    <p>Every sighting shows how much weight it can bear. The level is set by the site from how the report arrived, never by the shopper.</p>
+    <table>
+      <thead><tr><th scope="col">Level</th><th scope="col">What it means</th></tr></thead>
+      <tbody>
+        <tr><td>0 · Typed report</td><td>Entered by hand with no attached proof.</td></tr>
+        <tr><td>1 · Screenshot fingerprint</td><td>The shopper chose a screenshot when reporting. Their browser computed the screenshot's fingerprint; only the fingerprint was sent. The shopper keeps the image.</td></tr>
+        <tr><td>2 · Page capture</td><td>Captured by the browser companion or a connected app at the moment of viewing, with a fingerprint of the page text around the price. The page text stays on the shopper's device.</td></tr>
+        <tr><td>3 · Archived page <span class="planned">planned</span></td><td>Adds a full saved copy of the page and an independent archive capture.</td></tr>
+        <tr><td>4 · Controlled test <span class="planned">planned</span></td><td>Part of a price check with a control pair and a roster of participants.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="fingerprints">
+    <h2>Fingerprints and the daily list</h2>
+    <p>A <strong>fingerprint</strong> (a SHA-256 hash) is a short code computed from a file or record. Change one character and the fingerprint changes completely, but the fingerprint alone reveals nothing about what it was made from. PriceWitness uses three kinds:</p>
+    <ul>
+      <li><strong>Record fingerprint:</strong> computed by the site when a sighting is received. It is SHA-256 of the JSON array <code>["pw-evidence-v1", salt, id, comparison id, price in cents, crossed-out price, fees, checkout total, search position, notice, notice wording, setup answers, state, time seen, proof fingerprint, price check code, evidence level, time received]</code>. The <strong>salt</strong> is a random code kept privately with each record; it stops anyone from working out the private answers (setup, state, exact time) by trying combinations against the public fingerprint. Missing numbers are <code>null</code>, missing text is an empty string, and setup answers are written as JSON with their keys in alphabetical order.</li>
+      <li><strong>Page capture fingerprint:</strong> SHA-256 of <code>["pw-page-v1", page address without its query string, time seen, price in cents, page text]</code>, computed in the shopper's browser.</li>
+      <li><strong>Screenshot fingerprint:</strong> SHA-256 of the image file exactly as saved.</li>
+    </ul>
+    <p>Every record fingerprint is added to a public <strong>daily list</strong>, one per line in sorted order. The list for any day is published at <code>/api/ledger?day=YYYY-MM-DD&amp;format=text</code>, and the fingerprint of that text file is the day's <strong>root</strong>. Anyone holding a full record can recompute its fingerprint, find it in that day's list and confirm the list's root. The list keeps a fingerprint even if the shopper later removes their report. When a shopper's newer price replaces their older one in the same local comparison, only the newer record is kept; the older fingerprint stays in the list.</p>
+    <p>To show that no list was rewritten after the fact, each completed day's list is meant to be stamped by two independent timestamp services (the RFC 3161 standard) and saved in the project's public code repository. <strong>This step is set up but not yet running on a schedule</strong>; until it is, the daily lists are not independently timestamped.</p>
+    <div id="ledger" class="ledger" aria-live="polite"><p class="muted">Loading recent daily lists…</p></div>
+  </section>
+
+  <section id="privacy">
+    <h2>Privacy</h2>
+    <p>Price reports are records of what people bought or considered, and such records can identify people. PriceWitness collects as little as it can and publishes less than it collects.</p>
+    <ul>
+      <li><strong>Never collected:</strong> names, email addresses, home addresses, loyalty or order numbers, merchant passwords, and internet (IP) addresses with reports. Screenshots and page text never leave the shopper's device; only fingerprints do.</li>
+      <li><strong>Public on each sighting:</strong> the price and price breakdown, the notice answer and wording, the evidence level, the price check code, the shopper's chosen alias and the account conditions they typed. Other people see the hour a price was seen, not the minute.</li>
+      <li><strong>Shown only as totals:</strong> setup answers (signed in, member, device, app or website, where the shopper was, seen before) and the shopper's state. These are never shown one report at a time, and totals appear only once at least three different shoppers have reported the same offer.</li>
+      <li><strong>Kept by the site:</strong> a site-specific sign-in identifier that links a shopper to their own reports so they can remove them, the exact time seen and the time received.</li>
+    </ul>
+    <p>Shoppers can remove their own sightings and comments at any time. The site uses no advertising pixels or third-party analytics scripts.</p>
+  </section>
+
+  <section id="dictionary">
+    <h2>Data dictionary</h2>
+    <table class="dictionary">
+      <thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Public?</th></tr></thead>
+      <tbody>
+        <tr><th scope="row" colspan="3" class="group">Offer</th></tr>
+        <tr><td><code>merchant</code></td><td>Retailer or provider that showed the price.</td><td>Yes</td></tr>
+        <tr><td><code>title</code>, <code>variant</code></td><td>The product or service and the details that identify the same offer.</td><td>Yes</td></tr>
+        <tr><td><code>category</code>, <code>currency</code></td><td>Sector and currency. Local offers are in USD.</td><td>Yes</td></tr>
+        <tr><td><code>market</code>, <code>offer_spec</code></td><td>For local offers: store, route or service area, fulfillment and sector-specific terms.</td><td>Yes</td></tr>
+        <tr><td><code>period_start</code>, <code>period_minutes</code></td><td>The comparison window for everyday local reports.</td><td>Yes</td></tr>
+        <tr><td><code>campaign</code></td><td>Price check code, if the comparison belongs to an organized test.</td><td>Yes</td></tr>
+        <tr><th scope="row" colspan="3" class="group">Sighting</th></tr>
+        <tr><td><code>cents</code></td><td>The price shown, in cents.</td><td>Yes</td></tr>
+        <tr><td><code>list_cents</code></td><td>Crossed-out “was” price shown next to the price.</td><td>Yes</td></tr>
+        <tr><td><code>fees_cents</code></td><td>Fees added at checkout (delivery, service, booking).</td><td>Yes</td></tr>
+        <tr><td><code>total_cents</code></td><td>Checkout total before tax.</td><td>Yes</td></tr>
+        <tr><td><code>search_rank</code></td><td>Position of the item in search results (1 = first).</td><td>Yes</td></tr>
+        <tr><td><code>notice</code></td><td>Personalized-price notice: <code>none</code> (looked, none shown), <code>near-price</code>, <code>behind-link</code>, <code>elsewhere</code>, or empty (did not check).</td><td>Yes</td></tr>
+        <tr><td><code>notice_text</code></td><td>Exact notice wording, kept only when a notice was shown.</td><td>Yes</td></tr>
+        <tr><td><code>context</code></td><td>Account and offer conditions in the shopper's words.</td><td>Yes</td></tr>
+        <tr><td><code>conditions</code></td><td>Setup answers: <code>signedIn</code>, <code>member</code>, <code>device</code>, <code>surface</code> (app or website), <code>place</code>, <code>viewedBefore</code>.</td><td>Totals only, from 3 shoppers</td></tr>
+        <tr><td><code>shopper_state</code></td><td>Two-letter US state the shopper was in.</td><td>Totals only</td></tr>
+        <tr><td><code>seen</code>, <code>observed_at</code></td><td>Date and, when known, exact time the price was seen.</td><td>Date and hour</td></tr>
+        <tr><td><code>received_at</code></td><td>When the site received the report.</td><td>No</td></tr>
+        <tr><td><code>channel</code></td><td>How the report arrived (shopper report or connected app).</td><td>Yes</td></tr>
+        <tr><td><code>tier</code></td><td>Evidence level, 0 to 2 today.</td><td>Yes</td></tr>
+        <tr><td><code>proof_hash</code></td><td>Fingerprint of the shopper's screenshot or page capture.</td><td>No (in the record fingerprint)</td></tr>
+        <tr><td><code>record_hash</code></td><td>Record fingerprint, also listed in the daily list.</td><td>Yes</td></tr>
+        <tr><td><code>record_salt</code></td><td>Random code mixed into the record fingerprint.</td><td>No</td></tr>
+        <tr><td><code>alias</code></td><td>Display name the shopper chose, or “Anonymous shopper”.</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="wording">
+    <h2>Wording and corrections</h2>
+    <p>PriceWitness describes what shoppers saw, not why. A finding reads like “11 shoppers saw prices for the identical item differ by up to 9% within 20 minutes; none saw a personalization notice,” not “Company X uses your personal data to raise prices.” Claims about a company's motives or methods are made only when a controlled test or the company's own statement supports them. Tests that find no difference are published as prominently as tests that do.</p>
+    <p>To report an error, request a correction or respond on behalf of a company, email <a href="mailto:price_witness@outlook.com">price_witness@outlook.com</a>.</p>
+    <p>PriceWitness has no ads, affiliate links, coupon commissions or paid placement, and takes no money from the companies whose prices it shows. The code is open source under the MIT License.</p>
+  </section>
+
+  <section id="limits">
+    <h2>What the data cannot show</h2>
+    <ul>
+      <li>A price difference does not by itself show that a company used personal data. Timing, stock, sellers, coupons and memberships can all explain a gap. Controlled price checks are needed to rule those out.</li>
+      <li>Reports come from volunteers, not a random sample of shoppers, so totals describe the people who reported, not all customers.</li>
+      <li>Typed reports cannot be independently confirmed. Evidence levels say how much each report can be relied on.</li>
+      <li>Fixed time windows can split two shoppers who checked seconds apart into different comparisons. Price checks avoid this by grouping on the code.</li>
+    </ul>
+  </section>
+</main>
+<footer class="wrap site-foot"><span>PriceWitness</span><div><a href="/">Explore prices</a><a href="https://github.com/ryan77718/pricewitness">Source code</a></div></footer>
+<script type="module" src="/methods-ledger.js"></script>
+</body>
+</html>
